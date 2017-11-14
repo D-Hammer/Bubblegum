@@ -10,6 +10,7 @@
   - 4 motors later to allow use for Mecanum-Master-Race
 - Control weapon motor
 - IMU/PID drive to make up for my lack of driving skill
+- Remote adjustable expo, user selectable mixing, sense and remix for inverted driving, remote switch for PID
 
 
 
