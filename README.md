@@ -36,7 +36,7 @@ V1.00
 - Prototype
 - 0.8mm FR4, 2oz Cu
 
-## Software
+## Firmware
 
 11/14/17 
 - Added alternate FW for DShot implementation
