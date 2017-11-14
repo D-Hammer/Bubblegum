@@ -19,22 +19,22 @@
 ## Hardware
 
 V1.20
--IMU integrated into control board.  
--3.3v power system added
--Decreased current capacity on 5V supply to free up board space
--0.8mm FR4, 2oz Cu
+- IMU integrated into control board.  
+- 3.3v power system added
+- Decreased current capacity on 5V supply to free up board space
+- 0.8mm FR4, 2oz Cu
 
 V1.10
--Increased power input hole diameters
+- Increased power input hole diameters
 
 V1.01
--Rerouted weapon pwm signal to different GPIO
--Added versioning and logo on back silk
--1.5mm FR4, 1oz Cu
+- Rerouted weapon pwm signal to different GPIO
+- Added versioning and logo on back silk
+- 1.5mm FR4, 1oz Cu
 
 V1.00
--Prototype
--0.8mm FR4, 2oz Cu
+- Prototype
+- 0.8mm FR4, 2oz Cu
 
 ## Software
 
