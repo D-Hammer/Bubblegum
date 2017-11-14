@@ -1,7 +1,7 @@
 # Bubblegum
-##Integrated control board
+## Integrated control board
 
-###Scope: 
+### Scope: 
 -Interface with an RC receiver
   -Sbus is priority
   -Other variants will be created later
@@ -15,11 +15,11 @@
 
 
 # Changelog
-##Hardware
+## Hardware
 
 V1.20
 -IMU integrated into control board.  
 
-##Software
+## Software
 
 
