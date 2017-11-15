@@ -38,6 +38,17 @@ V1.00
 
 ## Firmware
 
+### To Do
+- Add weapon output to DS branch
+- Update PWM branch with DS branch improvements
+
+11/15/17
+- Added deadband to drive inputs
+- Increased data inclusivity on gyro calibration
+- Fixed expo scaling issue
+- Fixed sign of gyroOffset in PID
+- DShot center is 1048 in 3D mode, NOT 1047 :/
+
 11/14/17 
 - Added alternate FW for DShot implementation
 - dshot fiddlings file uses UART and requires inverter (untested) (DShot150)
