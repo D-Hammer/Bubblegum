@@ -19,6 +19,7 @@ uint8_t i;
 
 ////////// Control Vars //////////
 uint8_t expoval = 50;
+uint8_t deadband = 15;
 
 ////////// Pid Vars //////////
 double Kp = 4.0, Ki = 0.0, Kd = 0.0;
@@ -30,7 +31,7 @@ int16_t dShotVal = 0; // Initialize in disarm status, valid vals: 48-2047
 uint8_t pin = 32; // Right wheel is 32, Left wheel is 64
 
 void setup() {
-  //mserial.begin(115200); //Begins debug serial com
+  // mserial.begin(115200); //Begins debug serial com
   sBus.begin();
   Wire.begin();          //Begins I2C for IMU
   Wire.setClock(400000UL); // Set I2C frequency to 400kHz
@@ -58,7 +59,7 @@ void setup() {
   while (i < 100) { // Calibrate gyro
     while (i2cRead(0x47, i2cData, 2)); // Read value
     gyroZ = (i2cData[0] << 8) | i2cData[1];
-    if (gyroZ < 250 && gyroZ > -250) { // Save value if not moving too much
+    if (gyroZ < 2500 && gyroZ > -2500) { // Save value if not moving too much
       i += 1;
       gyroOffset += gyroZ;
       //  mserial.println(i);
@@ -80,11 +81,6 @@ void setup() {
   timer = micros();
   //mserial.print(F("Microseconds to initialize: "));
   //mserial.println(timer);
-
-  for (uint16_t i = 0; i < 500; i++) {
-    transmit_dShot(dShotVal, pin);
-    delay(10);
-  }
 
   digitalWrite(13, 1);
 }
@@ -149,11 +145,12 @@ void loop() {
   // PID
   if (sBus.channels[6] > 1600) { // Ch7 toggles PID on/off
     clockwise_spin = clockwise_spin * maxSpin; // Rescale from % to degrees/sec
+    if (abs(clockwise_spin) * 2 < 1) clockwise_spin = 0; // Deadband
     P0 = P;
     if (accZ < -11000) { // No death spirals!
-      P = clockwise_spin - (fGyro / 131.0 + gyroOffset);
+      P = clockwise_spin - (fGyro / 131.0 - gyroOffset);
     } else {
-      P = clockwise_spin + (fGyro / 131.0 + gyroOffset); // P is error, 131 scales to deg/s for sensitivity of 250, add calibration
+      P = clockwise_spin + (fGyro / 131.0 - gyroOffset); // P is error, 131 scales to deg/s for sensitivity of 250, add calibration
     }
     I += P * dt;
     D = (P - P0) / dt;
@@ -163,22 +160,24 @@ void loop() {
 
   // Convert from spd and cws to wheel outputs
   if (spd - clockwise_spin < 0) {
-    ch1 = (spd - clockwise_spin + 1) * -999 + 1047;
-    if (ch1 < 48) ch1 = 48;
+    ch1 = (spd - clockwise_spin + 1.0) * -999.0 + 1047;
     if (ch1 > 1047) ch1 = 1047;
+    if (ch1 < 48 + deadband) ch1 = 1048;
   }
   else {
-    ch1 = (spd - clockwise_spin) * 999 + 1048;
+    ch1 = (spd - clockwise_spin) * 999.0 + 1048;
     if (ch1 > 2047) ch1 = 2047;
+    if (ch1 < 1048 + deadband) ch1 = 1048;
   }
   if (spd + clockwise_spin < 0) {
-    ch2 = (spd + clockwise_spin + 1) * -999 + 1047;
-    if (ch2 < 48) ch2 = 48;
+    ch2 = (spd + clockwise_spin + 1.0) * -999.0 + 1047;
     if (ch2 > 1047) ch2 = 1047;
+    if (ch2 < 48 + deadband) ch2 = 1048;
   }
   else {
-    ch2 = (spd + clockwise_spin) * 999 + 1048;
+    ch2 = (spd + clockwise_spin) * 999.0 + 1048;
     if (ch2 > 2047) ch2 = 2047;
+    if (ch2 < 1048 + deadband) ch2 = 1048;
   }
 
 
