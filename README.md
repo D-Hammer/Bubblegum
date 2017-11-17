@@ -42,6 +42,12 @@ V1.00
 - Add weapon output to DS branch
 - Update PWM branch with DS branch improvements
 
+11/17/17
+- Filtered the inversion sensing
+- added deadband to PID to stop zero throttle flutter
+- PID correction now proportional to throttle input [0.5 + abs(spd)]
+- Tuned gains. Settled on P1.2 I0.02 D0.05
+
 11/15/17
 - Added deadband to drive inputs
 - Increased data inclusivity on gyro calibration
