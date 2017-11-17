@@ -1,6 +1,5 @@
 #include <Wire.h>
 #include <FUTABA_SBUS.h> // Source: http://www.ernstc.dk/arduino/sbus.html
-
 //#include <SoftwareSerial.h> // For debugging
 
 ////////// Create instances //////////
@@ -20,9 +19,10 @@ uint8_t i;
 ////////// Control Vars //////////
 uint8_t expoval = 50;
 uint8_t deadband = 15;
+uint8_t inversionCounter;
 
 ////////// Pid Vars //////////
-double Kp = 4.0, Ki = 0.0, Kd = 0.0;
+double Kp = 1.2, Ki = 0.02, Kd = 0.05;
 double P0, P, I, D;
 int16_t maxSpin = 500; // Degrees per second, Remember to set gyro scale register accordingly
 
@@ -62,7 +62,6 @@ void setup() {
     if (gyroZ < 2500 && gyroZ > -2500) { // Save value if not moving too much
       i += 1;
       gyroOffset += gyroZ;
-      //  mserial.println(i);
     }
     delay(30);
   }
@@ -79,9 +78,6 @@ void setup() {
   }
 
   timer = micros();
-  //mserial.print(F("Microseconds to initialize: "));
-  //mserial.println(timer);
-
   digitalWrite(13, 1);
 }
 
@@ -128,9 +124,9 @@ void loop() {
   // Determine desired movement
   double spd, clockwise_spin;
   if (sBus.channels[5] > 1600) { // Ch6 toggles between straight and diagonal drive
-    spd = (ch2 - ch1) / 2.0;
+    spd = (ch2 - ch1) / 2.0; // Diagonal mix
     clockwise_spin = (ch2 + ch1) / 2.0;
-  } else { // Mixed driving
+  } else { // Straight
     spd = ch2;
     clockwise_spin = ch1;
   }
@@ -138,6 +134,12 @@ void loop() {
 
   // Upside down reversing
   if (accZ < -11000) {
+    if (inversionCounter < 200) inversionCounter++;
+  }
+  else {
+    if (inversionCounter > 0) inversionCounter--;
+  }
+  if (inversionCounter > 100) {
     spd = -spd;
   }
 
@@ -147,14 +149,15 @@ void loop() {
     clockwise_spin = clockwise_spin * maxSpin; // Rescale from % to degrees/sec
     if (abs(clockwise_spin) * 2 < 1) clockwise_spin = 0; // Deadband
     P0 = P;
-    if (accZ < -11000) { // No death spirals!
+    if (inversionCounter > 100) { // No death spirals!
       P = clockwise_spin - (fGyro / 131.0 - gyroOffset);
     } else {
       P = clockwise_spin + (fGyro / 131.0 - gyroOffset); // P is error, 131 scales to deg/s for sensitivity of 250, add calibration
     }
+    if (abs(P) < 10 && abs(spd) < 0.02) P = 0;
     I += P * dt;
     D = (P - P0) / dt;
-    clockwise_spin = (clockwise_spin + Kp * P + Ki * I + Kd * D) / maxSpin; // Apply PID and rescale back to %
+    clockwise_spin = (clockwise_spin + (0.6 + abs(spd)) * (Kp * P + Ki * I + Kd * D)) / maxSpin; // Apply PID and rescale back to %
   }
 
 
@@ -182,10 +185,8 @@ void loop() {
 
 
   // Update outputs
-  dShotVal = ch1;
-  pin = 32; // Right wheel, ch1
+  dShotVal = ch1; pin = 32; // Right wheel, ch1
   transmit_dShot(dShotVal, pin);
-  dShotVal = ch2;
-  pin = 64; // Left wheel, ch2
+  dShotVal = ch2; pin = 64; // Left wheel, ch2
   transmit_dShot(dShotVal, pin);
 }
