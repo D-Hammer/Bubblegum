@@ -6,7 +6,7 @@
 
 ////////// Create instances //////////
 //SoftwareSerial mserial(10, 11); // RX, TX
-FUTABA_SBUS sBus; // sBus over serial
+FUTABA_SBUS sBus;    // sBus over serial
 Servo RWheelOUT;     // Output channels
 Servo LWheelOUT;     //
 Servo WeaponOUT;     //
@@ -23,6 +23,8 @@ uint8_t i;
 
 ////////// Control Vars //////////
 uint8_t expoval = 50;
+uint8_t deadband = 15;
+uint8_t inversionCounter;
 
 ////////// Pid Vars //////////
 double Kp = 4.0, Ki = 0.0, Kd = 0.0;
@@ -58,7 +60,7 @@ void setup() {
   while (i < 100) { // Calibrate gyro
     while (i2cRead(0x47, i2cData, 2)); // Read value
     gyroZ = (i2cData[0] << 8) | i2cData[1];
-    if (gyroZ < 250 && gyroZ > -250) { // Save value if not moving too much
+    if (gyroZ < 2500 && gyroZ > -2500) { // Save value if not moving too much
       i += 1;
       gyroOffset += gyroZ;
       //  mserial.println(i);
@@ -127,9 +129,9 @@ void loop() {
   // Determine desired movement
   double spd, clockwise_spin;
   if (sBus.channels[5] > 1600) { // Ch6 toggles between straight and diagonal drive
-    spd = (ch2 - ch1) / 2.0;
+    spd = (ch2 - ch1) / 2.0; // Diagonal mix
     clockwise_spin = (ch2 + ch1) / 2.0;
-  } else { // Mixed driving
+  } else { // Straight
     spd = ch2;
     clockwise_spin = ch1;
   }
@@ -137,6 +139,12 @@ void loop() {
 
   // Upside down reversing
   if (accZ < -11000) {
+    if (inversionCounter < 200) inversionCounter++;
+  }
+  else {
+    if (inversionCounter > 0) inversionCounter--;
+  }
+  if (inversionCounter > 100) {
     spd = -spd;
   }
 
@@ -150,6 +158,7 @@ void loop() {
     } else {
       P = clockwise_spin + (fGyro / 131.0 + gyroOffset); // P is error, 131 scales to deg/s for sensitivity of 250, add calibration
     }
+    if (abs(P) < 10 && abs(spd) < 0.02) P = 0; // PID deadband to prevent zero throttle jittering
     I += P * dt;
     D = (P - P0) / dt;
     clockwise_spin = (clockwise_spin + Kp * P + Ki * I + Kd * D) / maxSpin; // Apply PID and rescale back to %

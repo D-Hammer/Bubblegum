@@ -1,10 +1,12 @@
 #include <Wire.h>
+#include <Servo.h>
 #include <FUTABA_SBUS.h> // Source: http://www.ernstc.dk/arduino/sbus.html
 //#include <SoftwareSerial.h> // For debugging
 
 ////////// Create instances //////////
 //SoftwareSerial mserial(10, 11); // RX, TX
-FUTABA_SBUS sBus; // sBus over serial
+FUTABA_SBUS sBus;                 // sBus over serial
+Servo WeaponOUT;                  // Weapon output
 
 ////////// IMU Data //////////
 double accX, accY, accZ;
@@ -22,7 +24,7 @@ uint8_t deadband = 15;
 uint8_t inversionCounter;
 
 ////////// Pid Vars //////////
-double Kp = 1.2, Ki = 0.02, Kd = 0.05;
+double Kp = 1.8, Ki = 0.02, Kd = 0.005;
 double P0, P, I, D;
 int16_t maxSpin = 500; // Degrees per second, Remember to set gyro scale register accordingly
 
@@ -71,6 +73,9 @@ void setup() {
   //mserial.println(gyroOffset);
   //mserial.println(F("Sensor Stabilized"));
 
+  digitalWrite(13, 1);
+
+  WeaponOUT.attach(15);
   for (uint16_t i = 0; i < 500; i++) { // Initialize the drive in unarmed state
     transmit_dShot(dShotVal, 32);
     transmit_dShot(dShotVal, 64);
@@ -78,7 +83,6 @@ void setup() {
   }
 
   timer = micros();
-  digitalWrite(13, 1);
 }
 
 void loop() {
@@ -154,7 +158,7 @@ void loop() {
     } else {
       P = clockwise_spin + (fGyro / 131.0 - gyroOffset); // P is error, 131 scales to deg/s for sensitivity of 250, add calibration
     }
-    if (abs(P) < 10 && abs(spd) < 0.02) P = 0;
+    if (abs(P) < 10 && abs(spd) < 0.02) P = 0; // PID deadband to prevent zero throttle jittering
     I += P * dt;
     D = (P - P0) / dt;
     clockwise_spin = (clockwise_spin + (0.6 + abs(spd)) * (Kp * P + Ki * I + Kd * D)) / maxSpin; // Apply PID and rescale back to %
@@ -189,4 +193,5 @@ void loop() {
   transmit_dShot(dShotVal, pin);
   dShotVal = ch2; pin = 64; // Left wheel, ch2
   transmit_dShot(dShotVal, pin);
+  WeaponOUT.writeMicroseconds(map(sBus.channels[0], 172, 1811, 1000, 2000)); // Output weapon motor signal
 }
