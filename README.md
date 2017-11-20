@@ -12,7 +12,9 @@
 - IMU/PID drive to make up for my lack of driving skill
 - Remote adjustable expo, user selectable mixing, sense and remix for inverted driving, remote switch for PID
 
-
+### To Do
+- Test and tune on various drive topologies
+- Branch HW and FW to interface w/ standard pwm receivers
 
 
 # Changelog
@@ -38,9 +40,10 @@ V1.00
 
 ## Firmware
 
-### To Do
-- Add weapon output to DS branch
+11/20/17
+- Added weapon output to DS branch (servo lib implementation)
 - Update PWM branch with DS branch improvements
+- New PID gains: P1.8 I0.02 D0.005
 
 11/17/17
 - Filtered the inversion sensing
