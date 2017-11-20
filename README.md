@@ -20,45 +20,45 @@
 # Changelog
 ## Hardware
 
-V1.20
+### V1.20
 - IMU integrated into control board.  
 - 3.3v power system added
 - Decreased current capacity on 5V supply to free up board space
 - 0.8mm FR4, 2oz Cu
 
-V1.10
+### V1.10
 - Increased power input hole diameters
 
-V1.01
+### V1.01
 - Rerouted weapon pwm signal to different GPIO
 - Added versioning and logo on back silk
 - 1.5mm FR4, 1oz Cu
 
-V1.00
+### V1.00
 - Prototype
 - 0.8mm FR4, 2oz Cu
 
 ## Firmware
 
-11/20/17
+### 11/20/17
 - Added weapon output to DS branch (servo lib implementation)
 - Update PWM branch with DS branch improvements
 - New PID gains: P1.8 I0.02 D0.005
 
-11/17/17
+### 11/17/17
 - Filtered the inversion sensing
 - added deadband to PID to stop zero throttle flutter
 - PID correction now proportional to throttle input [0.5 + abs(spd)]
 - Tuned gains. Settled on P1.2 I0.02 D0.05
 
-11/15/17
+### 11/15/17
 - Added deadband to drive inputs
 - Increased data inclusivity on gyro calibration
 - Fixed expo scaling issue
 - Fixed sign of gyroOffset in PID
 - DShot center is 1048 in 3D mode, NOT 1047 :/
 
-11/14/17 
+### 11/14/17 
 - Added alternate FW for DShot implementation
 - dshot fiddlings file uses UART and requires inverter (untested) (DShot150)
 - bit banging like an animal is addressable on port D and functional (DShot600)
