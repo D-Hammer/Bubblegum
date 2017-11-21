@@ -7,7 +7,7 @@
   - Other variants will be created later
 - Control drive motors
   - 2 motors priority
-  - 4 motors later to allow use for Mecanum-Master-Race
+  - 4 motors later to allow use for Mecanum, etc.
 - Control weapon motor
 - IMU/PID drive to make up for my lack of driving skill
 - Remote adjustable expo, user selectable mixing, sense and remix for inverted driving, remote switch for PID
