@@ -20,6 +20,12 @@
 # Changelog
 ## Hardware
 
+### V1.30
+- Reduced footprint to 0.94"x0.94"
+- Through holes for outputs are now pads to allow for a more compact profile
+- 0.8mm FR4, 2oz Cu
+- 0.050" pitch programming header
+
 ### V1.20
 - IMU integrated into control board.  
 - 3.3v power system added
@@ -39,6 +45,13 @@
 - 0.8mm FR4, 2oz Cu
 
 ## Firmware
+
+### 2/6/18
+- Minor tweaks to main loop
+- Throttle scaling factor added to PID to improve low throttle stability and high throttle tracking
+- New boot sequence to communicate with PID tuner
+- Library change from SoftwareSerial to NeoSWSerial
+- PID Tuner: New, alpha release, programming functions reliably, reading is buggy
 
 ### 11/20/17
 - Added weapon output to DS branch (servo lib implementation)
