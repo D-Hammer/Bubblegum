@@ -1,10 +1,15 @@
 #include <Wire.h>
 #include <Servo.h>
 #include <FUTABA_SBUS.h> // Source: http://www.ernstc.dk/arduino/sbus.html
-//#include <SoftwareSerial.h> // For debugging
+#include <EEPROM.h>
+#define debug 0 // Serial debug mode, 0 for off, 1 for on
+#include <NeoSWSerial.h> // For debugging and programming
 
 ////////// Create instances //////////
-//SoftwareSerial mserial(10, 11); // RX, TX
+#if debug
+NeoSWSerial mserial(10, 11); // RX, TX (serial for debug)
+#endif
+NeoSWSerial pserial(11, 12); // RX, TX (serial for programmer)
 FUTABA_SBUS sBus;                 // sBus over serial
 Servo WeaponOUT;                  // Weapon output
 
@@ -19,30 +24,59 @@ double fGyro, gyroOffset;  // Filtered gyro value and gyro calibration offset
 uint8_t i;
 
 ////////// Control Vars //////////
-uint8_t expoval = 50;
+double expovalThrottle = 0.25;
 uint8_t deadband = 15;
 uint8_t inversionCounter;
 
 ////////// Pid Vars //////////
-double Kp = 1.8, Ki = 0.02, Kd = 0.005;
+uint16_t Pi, Ii, Di; // Scaled values, max is 65535
+double Kp = 1.81, Ki = 0.02, Kd = 0.005;
 double P0, P, I, D;
 int16_t maxSpin = 500; // Degrees per second, Remember to set gyro scale register accordingly
+uint8_t S, progInstruct; // Throttle scaling factor
 
 ////////// DShot Vars //////////
 int16_t dShotVal = 0; // Initialize in disarm status, valid vals: 48-2047
 uint8_t pin = 32; // Right wheel is 32, Left wheel is 64
 
 void setup() {
-  // mserial.begin(115200); //Begins debug serial com
+#if debug
+  mserial.begin(9600); // Pour a bowl of Serial. Begins debug serial com
+#endif
+
+
+  ///// PID Programming /////
+  pserial.begin(9600);
+  pinMode(12, OUTPUT);
+  initialize();
+  while (pserial.available() == 0 && i < 100) {
+    i++;
+    delay(1);
+  }
+  i = 0;
+  if (pserial.available() > 0) progInstruct = pserial.read();
+  if (progInstruct == 4) {
+    receiveData();
+  }
+  sendData();
+
+
+  ///// Normal Startup /////
   sBus.begin();
-  Wire.begin();          //Begins I2C for IMU
+  Wire.begin();          // Begins I2C for IMU
   Wire.setClock(400000UL); // Set I2C frequency to 400kHz
 
-  pinMode(13, OUTPUT);
+
+  pinMode(13, OUTPUT);  // Indicator LED
   digitalWrite(13, 1);
   delay(1000);
-  digitalWrite(13, 0);
-  //mserial.println("POST");
+  digitalWrite(13, 0); // Indicator LED off
+
+
+#if debug
+  mserial.println("POST");
+#endif
+
 
   i2cData[0] = 7; // Set the sample rate to 1000Hz - 8kHz/(7+1) = 1000Hz
   i2cData[1] = 0x00; // Disable FSYNC and set 260 Hz Acc filtering, 256 Hz Gyro filtering, 8 KHz sampling
@@ -52,26 +86,23 @@ void setup() {
   while (i2cWrite(0x1B, 0x10, true));
   while (i2cWrite(0x6B, 0x01, true)); // PLL with X axis gyroscope reference and disable sleep mode
   while (i2cRead(0x75, i2cData, 1));
-  if (i2cData[0] != 0x68) { // Read "WHO_AM_I" register
-    //mserial.print(F("Error reading sensor"));
-    while (1);
-  }
+
 
   delay(100); // Wait for sensor to stabilize
-  while (i < 100) { // Calibrate gyro
+  while (i < 150) { // Calibrate gyro
     while (i2cRead(0x47, i2cData, 2)); // Read value
     gyroZ = (i2cData[0] << 8) | i2cData[1];
     if (gyroZ < 2500 && gyroZ > -2500) { // Save value if not moving too much
       i += 1;
       gyroOffset += gyroZ;
     }
+    transmit_dShot(0, 32);
+    transmit_dShot(0, 64);
     delay(30);
   }
   i = 0;
-  gyroOffset = gyroOffset / 100.0 / 131.0; // Average over 100 values and scale to deg/s
-  //mserial.print(F("Sensor Offset: "));
-  //mserial.println(gyroOffset);
-  //mserial.println(F("Sensor Stabilized"));
+  gyroOffset = gyroOffset / 150.0 / 131.0; // Average over 100 values and scale to deg/s
+
 
   digitalWrite(13, 1);
 
@@ -86,25 +117,6 @@ void setup() {
 }
 
 void loop() {
-
-  /* Update all the values */
-  while (i2cRead(0x3B, i2cData, 14));
-  accX = ((i2cData[0] << 8) | i2cData[1]);
-  accY = ((i2cData[2] << 8) | i2cData[3]);
-  accZ = ((i2cData[4] << 8) | i2cData[5]);
-  tempRaw = (i2cData[6] << 8) | i2cData[7];
-  gyroX = (i2cData[8] << 8) | i2cData[9];
-  gyroY = (i2cData[10] << 8) | i2cData[11];
-  gyroZ = (i2cData[12] << 8) | i2cData[13];
-
-  double dt = (double)(micros() - timer) / 1000000; // Calculate delta time
-  timer = micros();
-
-  i += 1;
-  if (i > 4) i = 0;
-  gyroBuffer[i] = gyroZ;
-  fGyro = (gyroBuffer[0] + gyroBuffer[1] + gyroBuffer[2] + gyroBuffer[3] + gyroBuffer[4]) / 5;
-
 
   // SBUS in
   sBus.FeedLine();
@@ -121,7 +133,8 @@ void loop() {
   double ch1 = (sBus.channels[1] - 991.5) / 820.0; // Apply expo
   ch1 = expo * ch1 * ch1 * ch1 + (1.0 - expo) * ch1;
   double ch2 = (sBus.channels[2] - 991.5) / 820.0;
-  ch2 = expo * ch2 * ch2 * ch2 + (1.0 - expo) * ch2;
+  ch2 = expovalThrottle * ch2 * ch2 * ch2 + (1.0 - expovalThrottle) * ch2; // Added separate expo val for forward/reverse 12/24/17 per Matt & Brit feedback
+
 
 
   // Mixing
@@ -137,15 +150,35 @@ void loop() {
 
 
   // Upside down reversing
-  if (accZ < -11000) {
-    if (inversionCounter < 200) inversionCounter++;
+  if (accZ < -11000) { // If sensor says 3/4ish upside down or more
+    if (inversionCounter < 200) inversionCounter++; // if buffer isn't saturated then increment
   }
   else {
-    if (inversionCounter > 0) inversionCounter--;
+    if (inversionCounter > 0) inversionCounter--; // if not upside down and buffer isn't zero'd then decrement
   }
-  if (inversionCounter > 100) {
+  if (inversionCounter > 100) { // if buffer shows we're upside down a lot recently then invert controls
     spd = -spd;
   }
+
+
+  /* Update all the values */
+  while (i2cRead(0x3B, i2cData, 14));
+  //accX = ((i2cData[0] << 8) | i2cData[1]); // We don't care about these commented out datas presently
+  //accY = ((i2cData[2] << 8) | i2cData[3]);
+  accZ = ((i2cData[4] << 8) | i2cData[5]);
+  //tempRaw = (i2cData[6] << 8) | i2cData[7];
+  //gyroX = (i2cData[8] << 8) | i2cData[9];
+  //gyroY = (i2cData[10] << 8) | i2cData[11];
+  gyroZ = (i2cData[12] << 8) | i2cData[13];
+
+  double dt = (double)(micros() - timer) / 1000000; // Calculate delta time
+  timer = micros();
+
+  // Lowpass filter the gyro
+  i += 1;
+  if (i > 4) i = 0;
+  gyroBuffer[i] = gyroZ;
+  fGyro = (gyroBuffer[0] + gyroBuffer[1] + gyroBuffer[2] + gyroBuffer[3] + gyroBuffer[4]) / 5;
 
 
   // PID
@@ -161,7 +194,7 @@ void loop() {
     if (abs(P) < 10 && abs(spd) < 0.02) P = 0; // PID deadband to prevent zero throttle jittering
     I += P * dt;
     D = (P - P0) / dt;
-    clockwise_spin = (clockwise_spin + (0.6 + abs(spd)) * (Kp * P + Ki * I + Kd * D)) / maxSpin; // Apply PID and rescale back to %
+    clockwise_spin = (clockwise_spin + (S / 100.0 + abs(spd)) * (Kp * P + Ki * I + Kd * D)) / maxSpin; // Apply PID and rescale back to %
   }
 
 
